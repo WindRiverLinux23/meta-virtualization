@@ -9,8 +9,8 @@ Because of this focus, CNI has a wide range of support and the specification \
 is simple to implement. \
 "
 
-# 0.7.1
-SRCREV_cni = "4cfb7b568922a3c79a23e438dc52fe537fc9687e"
+# 1.0.1
+SRCREV_cni = "1694fd7b57e0176a98a12823a5ffc03337fdc152"
 # 1.1.1
 SRCREV_plugins = "4744ec27b89c083194e7df498de50f03a8a1d3ec"
 SRCREV_flannel_plugin = "076c4462d6c6887614fc881b806b690b9e56ceb2"
@@ -27,7 +27,7 @@ LIC_FILES_CHKSUM = "file://src/import/LICENSE;md5=fa818a259cbed7ce8bc2a22d35a464
 
 GO_IMPORT = "import"
 
-PV = "0.7.1"
+PV = "1.0.1"
 
 COMPATIBLE_HOST:mips = "null"
 
@@ -70,15 +70,21 @@ do_compile() {
 }
 
 do_install() {
-    localbindir="/opt/cni/bin"
+    localbindir="${libexecdir}/cni/"
 
     install -d ${D}${localbindir}
     install -d ${D}/${sysconfdir}/cni/net.d
 
     install -m 755 ${S}/src/import/cnitool/cnitool ${D}/${localbindir}
     install -m 755 -D ${WORKDIR}/plugins/bin/* ${D}/${localbindir}
+
+    # Parts of k8s expect the cni binaries to be available in /opt/cni
+    install -d ${D}/opt/cni
+    ln -sf ${libexecdir}/cni/ ${D}/opt/cni/bin
 }
 
-FILES:${PN} += "/opt/cni/bin/*"
+FILES:${PN} += "${libexecdir}/cni/* /opt/cni/bin"
 
 INSANE_SKIP:${PN} += "ldflags already-stripped"
+
+RDEPENDS:${PN} += " ca-certificates"
