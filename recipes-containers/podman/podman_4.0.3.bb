@@ -99,6 +99,10 @@ FILES:${PN} += " \
     ${sysconfdir}/cni \
 "
 
+# Fix ELF binary /usr/bin/podman has relocations in .text
+#lib32-podman: ELF binary /usr/bin/podman-remote has relocations in .text [textrel]
+INSANE_SKIP:${PN} += "textrel"
+
 SYSTEMD_SERVICE:${PN} = "podman.service podman.socket"
 
 RDEPENDS:${PN} += "conmon virtual-runc iptables cni skopeo fuse-overlayfs"
