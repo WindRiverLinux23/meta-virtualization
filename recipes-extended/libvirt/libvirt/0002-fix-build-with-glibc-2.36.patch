@@ -1,0 +1,61 @@
+libvirt: fix build with glibc-2.36
+
+add only necessary definitions from linux/fs.h, because including whole
+causes conflicts with sys/mount.h:
+
+| In file included from /path/to/tmp-glibc/work/core2-32-wrs-linux/libvirt/8.1.0-r0/recipe-sysroot/usr/include/linux/fs.h:19,
+|                  from ../libvirt-8.1.0/src/util/virfile.c:74:
+| /path/to/tmp-glibc/work/core2-32-wrs-linux/libvirt/8.1.0-r0/recipe-sysroot/usr/include/linux/mount.h:95:6: error: redeclaration of 'enum fsconfig_command'
+|    95 | enum fsconfig_command {
+|       |      ^~~~~~~~~~~~~~~~
+| In file included from ../libvirt-8.1.0/src/util/virfile.c:46:
+| /path/to/tmp-glibc/work/core2-32-wrs-linux/libvirt/8.1.0-r0/recipe-sysroot/usr/include/sys/mount.h:189:6: note: originally defined here
+|   189 | enum fsconfig_command
+|       |      ^~~~~~~~~~~~~~~~
+| /path/to/tmp-glibc/work/core2-32-wrs-linux/libvirt/8.1.0-r0/recipe-sysroot/usr/include/linux/mount.h:96:9: error: redeclaration of enumerator 'FSCONFIG_SET_FLAG'
+|    96 |         FSCONFIG_SET_FLAG       = 0,    /* Set parameter, supplying no value */
+|       |         ^~~~~~~~~~~~~~~~~
+
+...
+
+Upstream-Status: Pending
+
+Signed-off-by: Kai Kang <kai.kang@windriver.com>
+---
+ src/lxc/lxc_container.c |  1 -
+ src/util/virfile.c      | 10 +++++++++-
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/lxc/lxc_container.c b/src/lxc/lxc_container.c
+index d5410e9..3f49fb8 100644
+--- a/src/lxc/lxc_container.c
++++ b/src/lxc/lxc_container.c
+@@ -34,7 +34,6 @@
+ #include <linux/unistd.h>
+ 
+ /* For MS_MOVE */
+-#include <linux/fs.h>
+ 
+ #if WITH_CAPNG
+ # include <cap-ng.h>
+diff --git a/src/util/virfile.c b/src/util/virfile.c
+index a04f888..1cf118d 100644
+--- a/src/util/virfile.c
++++ b/src/util/virfile.c
+@@ -71,7 +71,15 @@
+ # endif
+ # include <sys/ioctl.h>
+ # include <linux/cdrom.h>
+-# include <linux/fs.h>
++// #include <linux/fs.h>       /* FIGETBSZ, FIBMAP, FS_IOC_* */
++// linux/fs.h unfortunately causes conflict with sys/mount.h since glibc-2.36
++// https://sourceware.org/glibc/wiki/Release/2.36#Usage_of_.3Clinux.2Fmount.h.3E_and_.3Csys.2Fmount.h.3E
++// add the necessary definitions
++
++#define FS_IOC_GETFLAGS                 _IOR('f', 1, long)
++#define FS_IOC_SETFLAGS                 _IOW('f', 2, long)
++#define FS_NOCOW_FL                     0x00800000 /* Do not cow file */
++
+ #endif
+ 
+ #if WITH_LIBATTR
