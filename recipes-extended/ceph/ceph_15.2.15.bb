@@ -23,6 +23,8 @@ SRC_URI = "http://download.ceph.com/tarballs/ceph-${PV}.tar.gz \
            file://0004-kv-rocksdb_cache-implement-methods-required-by-rocks.patch \
            file://0005-kv-rocksdb_cache-mark-Shard-const.patch \
            file://0006-rocksdb-build-with-rocksdb-7.y.z.patch \
+           file://CVE-2022-0670_1.patch \
+           file://CVE-2022-0670_2.patch \
 "
 
 SRC_URI[sha256sum] = "5dccdaff2ebe18d435b32bfc06f8b5f474bf6ac0432a6a07d144b7c56700d0bf"
