@@ -26,6 +26,8 @@ SRC_URI = "http://download.ceph.com/tarballs/ceph-${PV}.tar.gz \
            file://0001-common-fix-build-with-GCC-13-missing-cstdint-include.patch \
            file://0002-common-replace-BitVector-NoInitAllocator-with-wrappe.patch \
            file://0003-librdb-fix-build-with-gcc-13.patch \
+           file://CVE-2022-0670_1.patch \
+           file://CVE-2022-0670_2.patch \
 "
 
 SRC_URI[sha256sum] = "5dccdaff2ebe18d435b32bfc06f8b5f474bf6ac0432a6a07d144b7c56700d0bf"
