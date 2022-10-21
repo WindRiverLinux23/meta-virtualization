@@ -17,9 +17,9 @@ DEPENDS = " \
     ${@bb.utils.filter('DISTRO_FEATURES', 'systemd', d)} \
 "
 
-SRCREV = "62534053086fdeba7b93117e7c4dc6e797835a3e"
+SRCREV = "ad42af94903ce4f3c3cd0693e4e17e4286bf094b"
 SRC_URI = " \
-    git://github.com/containers/podman.git;branch=v4.0;protocol=https \
+    git://github.com/containers/podman.git;branch=v4.3;protocol=https \
 "
 
 LICENSE = "Apache-2.0"
@@ -97,6 +97,7 @@ FILES:${PN} += " \
     ${systemd_unitdir}/user/* \
     ${nonarch_libdir}/tmpfiles.d/* \
     ${sysconfdir}/cni \
+    ${datadir}/user-tmpfiles.d/* \
 "
 
 # Fix ELF binary /usr/bin/podman has relocations in .text
