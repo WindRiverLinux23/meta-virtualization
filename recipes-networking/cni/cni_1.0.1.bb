@@ -88,3 +88,5 @@ FILES:${PN} += "${libexecdir}/cni/* /opt/cni/bin"
 INSANE_SKIP:${PN} += "ldflags already-stripped"
 
 RDEPENDS:${PN} += " ca-certificates"
+
+DEFAULT_PREFERENCE = "1"
