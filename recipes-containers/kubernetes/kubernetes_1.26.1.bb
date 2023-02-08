@@ -1,19 +1,27 @@
-HOMEPAGE = "git://github.com/kubernetes/kubernetes"
+HOMEPAGE = "git://github.com/kubernetes/kubernetes;branch=master;protocol=https"
 SUMMARY = "Production-Grade Container Scheduling and Management"
 DESCRIPTION = "Kubernetes is an open source system for managing containerized \
 applications across multiple hosts, providing basic mechanisms for deployment, \
 maintenance, and scaling of applications. \
 "
 
-SRCREV_kubernetes = "632ed300f2c34f6d6d15ca4cef3d3c7073412212"
+PV = "v1.26.1"
+SRCREV_kubernetes = "8f94681cd294aa8cfd3407b8191f6c70214973a4"
 SRCREV_kubernetes-release = "7c1aa83dac555de6f05500911467b70aca4949f0"
+PE = "1"
 
-SRC_URI = "git://github.com/kubernetes/kubernetes.git;branch=release-1.22;name=kubernetes;protocol=https \
-           git://github.com/kubernetes/release;branch=master;name=kubernetes-release;destsuffix=git/release;protocol=https \
+SRCREV_FORMAT ?= "kubernetes_release"
+
+SRC_URI = "git://github.com/kubernetes/kubernetes.git;branch=release-1.26;name=kubernetes;protocol=https;destsuffix=git/src/github.com/kubernetes/kubernetes \
+           git://github.com/kubernetes/release;branch=master;name=kubernetes-release;destsuffix=git/release;protocol=https"
+
+SRC_URI:append = " \
            file://0001-hack-lib-golang.sh-use-CC-from-environment.patch \
            file://0001-cross-don-t-build-tests-by-default.patch \
            file://0001-build-golang.sh-convert-remaining-go-calls-to-use.patch \
-           file://0001-Makefile.generated_files-Fix-race-issue-for-installi.patch \
+           file://cni-containerd-net.conflist \
+           file://k8s-init \
+           file://99-kubernetes.conf \
           "
 
 DEPENDS += "rsync-native \
@@ -22,23 +30,21 @@ DEPENDS += "rsync-native \
            "
 
 LICENSE = "Apache-2.0"
-LIC_FILES_CHKSUM = "file://src/import/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57"
 
 GO_IMPORT = "import"
+S = "${WORKDIR}/git/src/github.com/kubernetes/kubernetes"
 
 inherit systemd
 inherit go
 inherit goarch
+inherit cni_networking
 
 COMPATIBLE_HOST = '(x86_64.*|arm.*|aarch64.*)-linux'
 
 do_compile() {
-	# link fixups for compilation
-	rm -f ${S}/src/import/vendor/src
-	ln -sf ./ ${S}/src/import/vendor/src
-
-	export GOPATH="${S}/src/import/.gopath:${S}/src/import/vendor:${STAGING_DIR_TARGET}/${prefix}/local/go"
-	cd ${S}/src/import
+	export GOPATH="${S}/src/import/.gopath:${S}/src/import/vendor:${STAGING_DIR_TARGET}/${prefix}/local/go:${WORKDIR}/git/"
+	cd ${S}
 
 	# Build the host tools first, using the host compiler
 	export GOARCH="${BUILD_GOARCH}"
@@ -53,7 +59,7 @@ do_compile() {
 	export CC="${BUILD_CC}"
 	export LD="${BUILD_LD}"
 
-	make generated_files GO="go" KUBE_BUILD_PLATFORMS="${HOST_GOOS}/${BUILD_GOARCH}"
+	#make generated_files GO="go" KUBE_BUILD_PLATFORMS="${HOST_GOOS}/${BUILD_GOARCH}"
 
 	# Build the target binaries
 	export GOARCH="${TARGET_GOARCH}"
@@ -78,28 +84,36 @@ do_install() {
 
     install -d ${D}${sysconfdir}/kubernetes/manifests/
 
-    install -m 755 -D ${S}/src/import/_output/local/bin/${TARGET_GOOS}/${TARGET_GOARCH}/* ${D}/${bindir}
+    install -m 755 -D ${S}/_output/local/bin/${TARGET_GOOS}/${TARGET_GOARCH}/* ${D}/${bindir}
 
     install -m 0644 ${WORKDIR}/git/release/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service ${D}${systemd_unitdir}/system/
     install -m 0644 ${WORKDIR}/git/release/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf  ${D}${systemd_unitdir}/system/kubelet.service.d/
+
+    if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
+	install -d "${D}${BIN_PREFIX}/bin"
+	install -m 755 "${WORKDIR}/k8s-init" "${D}${BIN_PREFIX}/bin"
+
+	install -d ${D}${sysconfdir}/sysctl.d
+	install -m 0644 "${WORKDIR}/99-kubernetes.conf" "${D}${sysconfdir}/sysctl.d"
+    fi
 }
 
-PACKAGES =+ "kubeadm kubectl kubelet kube-proxy ${PN}-misc"
+CNI_NETWORKING_FILES ?= "${WORKDIR}/cni-containerd-net.conflist"
+
+PACKAGES =+ "kubeadm kubectl kubelet kube-proxy ${PN}-misc ${PN}-host"
 
 ALLOW_EMPTY:${PN} = "1"
 INSANE_SKIP:${PN} += "ldflags already-stripped"
-INSANE_SKIP:${PN}-misc += "ldflags already-stripped"
+INSANE_SKIP:${PN}-misc += "ldflags already-stripped textrel"
 
 # Note: we are explicitly *not* adding docker to the rdepends, since we allow
 #       backends like cri-o to be used.
 RDEPENDS:${PN} += "kubeadm \
                    kubectl \
                    kubelet \
-                   cni \
-                   conntrack-tools \
-"
+                   kubernetes-cni"
 
-RDEPENDS:kubeadm = "kubelet kubectl"
+RDEPENDS:kubeadm = "kubelet kubectl cri-tools conntrack-tools"
 FILES:kubeadm = "${bindir}/kubeadm ${systemd_unitdir}/system/kubelet.service.d/*"
 
 RDEPENDS:kubelet = "iptables socat util-linux ethtool iproute2 ebtables iproute2-tc"
@@ -111,7 +125,27 @@ SYSTEMD_AUTO_ENABLE:kubelet = "enable"
 
 FILES:kubectl = "${bindir}/kubectl"
 FILES:kube-proxy = "${bindir}/kube-proxy"
-FILES:${PN}-misc = "${bindir}"
+FILES:${PN}-misc = "${bindir} ${sysconfdir}/sysctl.d"
 
+ALLOW_EMPTY:${PN}-host = "1"
+FILES:${PN}-host = "${BIN_PREFIX}/bin/k8s-init"
+RDEPENDS:${PN}-host = "${PN}"
+
+RRECOMMENDS:${PN} = "\
+                     kernel-module-xt-addrtype \
+                     kernel-module-xt-nat \
+                     kernel-module-xt-multiport \
+                     kernel-module-xt-conntrack \
+                     kernel-module-xt-comment \
+                     kernel-module-xt-mark \
+                     kernel-module-xt-connmark \
+                     kernel-module-vxlan \
+                     kernel-module-xt-masquerade \
+                     kernel-module-xt-statistic \
+                     kernel-module-xt-physdev \
+                     kernel-module-xt-nflog \
+                     kernel-module-xt-limit \
+                     kernel-module-nfnetlink-log \
+                     "
 
 deltask compile_ptest_base
