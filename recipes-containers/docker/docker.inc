@@ -160,7 +160,7 @@ inherit useradd
 USERADD_PACKAGES = "${PN}"
 GROUPADD_PARAM:${PN} = "-r docker"
 
-COMPATIBLE_HOST = "^(?!(qemu)?mips).*"
+COMPATIBLE_HOST = "^(?!(mips|riscv32)).*"
 
 INSANE_SKIP:${PN} += "ldflags textrel"
 
