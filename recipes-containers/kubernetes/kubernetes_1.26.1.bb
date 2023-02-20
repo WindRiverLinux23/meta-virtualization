@@ -42,6 +42,8 @@ inherit cni_networking
 
 COMPATIBLE_HOST = '(x86_64.*|arm.*|aarch64.*)-linux'
 
+BIN_PREFIX ?= "${exec_prefix}/local"
+
 do_compile() {
 	export GOPATH="${S}/src/import/.gopath:${S}/src/import/vendor:${STAGING_DIR_TARGET}/${prefix}/local/go:${WORKDIR}/git/"
 	cd ${S}
