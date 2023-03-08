@@ -18,38 +18,43 @@ DESCRIPTION = "Linux container runtime \
  subtle and/or glaring issues. \
  "
 
-# Notes:
-#   - This docker variant uses moby and the other individually maintained
-#     upstream variants for SRCREVs
-#   - It is a true community / upstream tracking build, and is not a
-#     docker curated set of commits or additions
-#   - The version number on this package tracks the versions assigned to
-#     the curated docker-ce repository. This allows compatibility and
-#     functional equivalence, while allowing new features to be more
-#     easily added.
-#   - This could be called "docker-moby" or just "moby" in the future, but
-#     that would require the creation of a virtual/docker dependency, which
-#     is possible, but overkill at the moment (while we wait for the upstream
-#     to stop changing).
-#   - The common components of this recipe and docker-ce do need to be moved
-#     to a docker.inc recipe
+#
+# https://github.com/docker/docker-ce-packaging.git
+#  common.mk:
+#    DOCKER_CLI_REPO    ?= https://github.com/docker/cli.git
+#    DOCKER_ENGINE_REPO ?= https://github.com/docker/docker.git
+#    REF                ?= HEAD
+#    DOCKER_CLI_REF     ?= $(REF)
+#    DOCKER_ENGINE_REF  ?= $(REF)
+#
+# These follow the tags for our releases in the listed repositories
+# so we get that tag, and make it our SRCREVS:
+#
 
-# v20.10.16
-SRCREV_moby = "f756502055d2e36a84f2068e6620bea5ecf09058"
-# latest
-SRCREV_libnetwork = "339b972b464ee3d401b5788b2af9e31d09d6b7da"
-# v20.10.16
-SRCREV_cli = "aa7e414fdcb23a66e8fabbef0a560ef1769eace5"
-SRCREV_FORMAT = "moby_libnetwork"
+SRCREV_docker = "bc3805a0a0d3b5bd3f0e6c69f46ac08dd53377c7"
+SRCREV_libnetwork = "05b93e0d3a95952f70c113b0bc5bdb538d7afdd7"
+SRCREV_cli = "a5ee5b1dfc9b8f08ed9e020bb54fc18550173ef6"
+SRCREV_FORMAT = "docker_libnetwork"
 SRC_URI = "\
-	git://github.com/moby/moby.git;branch=20.10;name=moby;protocol=https \
+	git://github.com/docker/docker.git;branch=23.0;name=docker;protocol=https \
 	git://github.com/docker/libnetwork.git;branch=master;name=libnetwork;destsuffix=git/libnetwork;protocol=https \
-	git://github.com/docker/cli;branch=20.10;name=cli;destsuffix=git/cli;protocol=https \
-	file://docker.init \
+	git://github.com/docker/cli;branch=23.0;name=cli;destsuffix=git/cli;protocol=https \
 	file://0001-libnetwork-use-GO-instead-of-go.patch \
+	file://docker.init \
+        file://0001-dynbinary-use-go-cross-compiler.patch;patchdir=src/import \
         file://0001-cli-use-external-GO111MODULE-and-cross-compiler.patch \
-        file://0001-dynbinary-use-go-cross-compiler.patch \
 	"
+
+DOCKER_COMMIT = "${SRCREV_docker}"
+
+
+
+# Apache-2.0 for docker
+LICENSE = "Apache-2.0"
+LIC_FILES_CHKSUM = "file://src/import/LICENSE;md5=4859e97a9c7780e77972d989f0823f28"
+
+DOCKER_VERSION = "23.0.1"
+PV = "${DOCKER_VERSION}"
 
 DEPENDS = " \
     go-cli \
@@ -100,7 +105,7 @@ RPROVIDES:${PN}-dev += "docker-dev"
 RPROVIDES:${PN}-contrip += "docker-dev"
 
 inherit pkgconfig
-PACKAGECONFIG ??= "docker-init"
+PACKAGECONFIG ??= "docker-init seccomp"
 PACKAGECONFIG[seccomp] = "seccomp,,libseccomp"
 PACKAGECONFIG[docker-init] = ",,,docker-init"
 PACKAGECONFIG[transient-config] = "transient-config"
@@ -116,6 +121,9 @@ inherit goarch
 inherit pkgconfig
 
 do_configure[noexec] = "1"
+
+# Export for possible use in Makefiles, default value comes from go.bbclass
+export GO_LINKSHARED
 
 DOCKER_PKG="github.com/docker/docker"
 # in order to exclude devicemapper and btrfs - https://github.com/docker/docker/issues/14056
@@ -153,14 +161,14 @@ do_compile() {
 	# this is the unsupported built structure
 	# that doesn't rely on an existing docker
 	# to build this:
-	VERSION="${DOCKER_VERSION}" DOCKER_GITCOMMIT="${SRCREV_moby}" ./hack/make.sh dynbinary
+	VERSION="${DOCKER_VERSION}" DOCKER_GITCOMMIT="${DOCKER_COMMIT}" ./hack/make.sh dynbinary
 
         # build the cli
 	cd ${S}/src/import/.gopath/src/github.com/docker/cli
 	export CFLAGS=""
 	export LDFLAGS=""
 	export DOCKER_VERSION=${DOCKER_VERSION}
-	VERSION="${DOCKER_VERSION}" DOCKER_GITCOMMIT="${SRCREV_moby}" make dynbinary
+	VERSION="${DOCKER_VERSION}" DOCKER_GITCOMMIT="${DOCKER_COMMIT}" make dynbinary
 
 	# build the proxy
 	cd ${S}/src/import/.gopath/src/github.com/docker/libnetwork
@@ -179,8 +187,7 @@ do_install() {
 		# replaces one copied from above with one that uses the local registry for a mirror
 		install -m 644 ${S}/src/import/contrib/init/systemd/docker.service ${D}/${systemd_unitdir}/system
 		rm -f ${D}/${systemd_unitdir}/system/docker.service.rpm
-	fi
-	if ${@bb.utils.contains('DISTRO_FEATURES','sysvinit','true','false',d)}; then
+	else
 		install -d ${D}${sysconfdir}/init.d
 		install -m 0755 ${WORKDIR}/docker.init ${D}${sysconfdir}/init.d/docker.init
 	fi
@@ -201,15 +208,17 @@ SYSTEMD_PACKAGES = "${@bb.utils.contains('DISTRO_FEATURES','systemd','${PN}','',
 SYSTEMD_SERVICE:${PN} = "${@bb.utils.contains('DISTRO_FEATURES','systemd','docker.socket','',d)}"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
-INITSCRIPT_PACKAGES += "${@bb.utils.contains('DISTRO_FEATURES','sysvinit','${PN}','',d)}"
-INITSCRIPT_NAME:${PN} = "${@bb.utils.contains('DISTRO_FEATURES','sysvinit','docker.init','',d)}"
+# inverted logic warning. We ony want the sysvinit init to be installed if systemd
+# is NOT in the distro features
+INITSCRIPT_PACKAGES += "${@bb.utils.contains('DISTRO_FEATURES','systemd','', '${PN}',d)}"
+INITSCRIPT_NAME:${PN} = "${@bb.utils.contains('DISTRO_FEATURES','systemd','', 'docker.init',d)}"
 INITSCRIPT_PARAMS:${PN} = "defaults"
 
 inherit useradd
 USERADD_PACKAGES = "${PN}"
 GROUPADD_PARAM:${PN} = "-r docker"
 
-COMPATIBLE_HOST = "^(?!(qemu)?mips).*"
+COMPATIBLE_HOST = "^(?!(mips|riscv32)).*"
 
 INSANE_SKIP:${PN} += "ldflags textrel"
 
@@ -237,11 +246,4 @@ FILES:${PN}-cli += "${bindir}/docker"
 DOCKER_UNIFIED_PACKAGE ?= "True"
 RDEPENDS:${PN} += "${@bb.utils.contains("DOCKER_UNIFIED_PACKAGE", "True", "${PN}-cli", "", d)}"
 
-# Apache-2.0 for docker
-LICENSE = "Apache-2.0"
-LIC_FILES_CHKSUM = "file://src/import/LICENSE;md5=4859e97a9c7780e77972d989f0823f28"
-
-DOCKER_VERSION = "20.10.16"
-PV = "${DOCKER_VERSION}"
-
-CVE_PRODUCT = "docker"
+CVE_PRODUCT = "docker mobyproject:moby"
