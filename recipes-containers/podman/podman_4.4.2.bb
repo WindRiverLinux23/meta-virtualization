@@ -17,9 +17,9 @@ DEPENDS = " \
     ${@bb.utils.filter('DISTRO_FEATURES', 'systemd', d)} \
 "
 
-SRCREV = "ad42af94903ce4f3c3cd0693e4e17e4286bf094b"
+SRCREV = "74afe26887f814d1c39925a1624851ef3590e79c"
 SRC_URI = " \
-    git://github.com/containers/podman.git;branch=v4.3;protocol=https \
+    git://github.com/containers/podman.git;branch=v4.4;protocol=https \
 "
 
 LICENSE = "Apache-2.0"
@@ -94,6 +94,7 @@ do_install() {
 
 FILES:${PN} += " \
     ${systemd_unitdir}/system/* \
+    ${nonarch_libdir}/systemd/* \
     ${systemd_unitdir}/user/* \
     ${nonarch_libdir}/tmpfiles.d/* \
     ${sysconfdir}/cni \
