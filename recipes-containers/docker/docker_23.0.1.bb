@@ -43,6 +43,7 @@ SRC_URI = "\
 	file://docker.init \
         file://0001-dynbinary-use-go-cross-compiler.patch;patchdir=src/import \
         file://0001-cli-use-external-GO111MODULE-and-cross-compiler.patch \
+        file://0001-d-graphdriver-copy-support-src-fs-w-o-xattr-support.patch;patchdir=src/import \
 	"
 
 DOCKER_COMMIT = "${SRCREV_docker}"
