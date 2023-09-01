@@ -4,7 +4,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 inherit packagegroup
 
-COMPATIBLE_HOST = "^(?!(mips|riscv32)).*"
+COMPATIBLE_HOST = "^(?!(mips|riscv32|riscv64)).*"
 
 PACKAGES = "\
     packagegroup-container \
