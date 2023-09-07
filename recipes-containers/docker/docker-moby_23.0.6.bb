@@ -46,6 +46,11 @@ SRC_URI = "\
 	file://0001-libnetwork-use-GO-instead-of-go.patch \
         file://0001-cli-use-external-GO111MODULE-and-cross-compiler.patch \
         file://0001-dynbinary-use-go-cross-compiler.patch;patchdir=src/import \
+        file://0001-client-TestSetHostHeader-don-t-use-un-keyed-literals.patch;patchdir=src/import \
+        file://0002-client-define-a-dummy-hostname-to-use-for-local-conn.patch;patchdir=src/import \
+        file://0003-pkg-plugins-use-a-dummy-hostname-for-local-connectio.patch;patchdir=src/import \
+        file://0004-testutil-use-dummyhost-for-non-tcp-connections.patch;patchdir=src/import \
+        file://0001-23.0-vendor-github.com-docker-docker-0420d2b33c42-23.patch;patchdir=cli \
 	"
 
 DOCKER_COMMIT = "${SRCREV_moby}"

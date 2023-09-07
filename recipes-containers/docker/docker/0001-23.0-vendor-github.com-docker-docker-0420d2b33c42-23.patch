@@ -1,0 +1,149 @@
+From feb2d08fe7fe4a64c3ad20962610b507f4595a23 Mon Sep 17 00:00:00 2001
+From: Sebastiaan van Stijn <github@gone.nl>
+Date: Sat, 15 Jul 2023 15:57:36 +0200
+Subject: [PATCH] [23.0] vendor: github.com/docker/docker 0420d2b33c42
+ (23.0.7-dev)
+
+full diff: https://github.com/docker/docker/compare/v23.0.6...0420d2b33c42a9f0708c71a18948e60e1b9e4191
+
+Signed-off-by: Sebastiaan van Stijn <github@gone.nl>
+
+Upstream-Status: Backport [398104f939d76349e480e4b64faaa0392e29f51b]
+
+Signed-off-by: Chen Qi <Qi.Chen@windriver.com>
+---
+ vendor.mod                                    |  2 +-
+ vendor.sum                                    |  4 +--
+ .../github.com/docker/docker/client/client.go | 30 +++++++++++++++++++
+ .../github.com/docker/docker/client/hijack.go |  6 +++-
+ .../docker/docker/client/request.go           | 10 +++----
+ vendor/modules.txt                            |  2 +-
+ 6 files changed, 43 insertions(+), 11 deletions(-)
+
+diff --git a/vendor.mod b/vendor.mod
+index eed166a6de..127aa2ffb5 100644
+--- a/vendor.mod
++++ b/vendor.mod
+@@ -10,7 +10,7 @@ require (
+ 	github.com/containerd/containerd v1.6.19
+ 	github.com/creack/pty v1.1.11
+ 	github.com/docker/distribution v2.8.1+incompatible
+-	github.com/docker/docker v23.0.5+incompatible
++	github.com/docker/docker v23.0.7-0.20230715134620-0420d2b33c42+incompatible // v23.0.7-dev
+ 	github.com/docker/docker-credential-helpers v0.7.0
+ 	github.com/docker/go-connections v0.4.0
+ 	github.com/docker/go-units v0.5.0
+diff --git a/vendor.sum b/vendor.sum
+index 6edc40179f..69e6104e3f 100644
+--- a/vendor.sum
++++ b/vendor.sum
+@@ -101,8 +101,8 @@ github.com/denisenkom/go-mssqldb v0.0.0-20191128021309-1d7a30a10f73/go.mod h1:xb
+ github.com/docker/distribution v2.7.1+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
+ github.com/docker/distribution v2.8.1+incompatible h1:Q50tZOPR6T/hjNsyc9g8/syEs6bk8XXApsHjKukMl68=
+ github.com/docker/distribution v2.8.1+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
+-github.com/docker/docker v23.0.5+incompatible h1:DaxtlTJjFSnLOXVNUBU1+6kXGz2lpDoEAH6QoxaSg8k=
+-github.com/docker/docker v23.0.5+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
++github.com/docker/docker v23.0.7-0.20230715134620-0420d2b33c42+incompatible h1:2YPQGRAPTR51dHn0mNq0gPFbvLOKthzXuAvFBM2Ox5o=
++github.com/docker/docker v23.0.7-0.20230715134620-0420d2b33c42+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+ github.com/docker/docker-credential-helpers v0.7.0 h1:xtCHsjxogADNZcdv1pKUHXryefjlVRqWqIhk/uXJp0A=
+ github.com/docker/docker-credential-helpers v0.7.0/go.mod h1:rETQfLdHNT3foU5kuNkFR1R1V12OJRRO5lzt2D1b5X0=
+ github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c h1:lzqkGL9b3znc+ZUgi7FlLnqjQhcXxkNM/quxIjBVMD0=
+diff --git a/vendor/github.com/docker/docker/client/client.go b/vendor/github.com/docker/docker/client/client.go
+index 09ea4851ff..ca9ceee43d 100644
+--- a/vendor/github.com/docker/docker/client/client.go
++++ b/vendor/github.com/docker/docker/client/client.go
+@@ -56,6 +56,36 @@ import (
+ 	"github.com/pkg/errors"
+ )
+ 
++// DummyHost is a hostname used for local communication.
++//
++// It acts as a valid formatted hostname for local connections (such as "unix://"
++// or "npipe://") which do not require a hostname. It should never be resolved,
++// but uses the special-purpose ".localhost" TLD (as defined in [RFC 2606, Section 2]
++// and [RFC 6761, Section 6.3]).
++//
++// [RFC 7230, Section 5.4] defines that an empty header must be used for such
++// cases:
++//
++//	If the authority component is missing or undefined for the target URI,
++//	then a client MUST send a Host header field with an empty field-value.
++//
++// However, [Go stdlib] enforces the semantics of HTTP(S) over TCP, does not
++// allow an empty header to be used, and requires req.URL.Scheme to be either
++// "http" or "https".
++//
++// For further details, refer to:
++//
++//   - https://github.com/docker/engine-api/issues/189
++//   - https://github.com/golang/go/issues/13624
++//   - https://github.com/golang/go/issues/61076
++//   - https://github.com/moby/moby/issues/45935
++//
++// [RFC 2606, Section 2]: https://www.rfc-editor.org/rfc/rfc2606.html#section-2
++// [RFC 6761, Section 6.3]: https://www.rfc-editor.org/rfc/rfc6761#section-6.3
++// [RFC 7230, Section 5.4]: https://datatracker.ietf.org/doc/html/rfc7230#section-5.4
++// [Go stdlib]: https://github.com/golang/go/blob/6244b1946bc2101b01955468f1be502dbadd6807/src/net/http/transport.go#L558-L569
++const DummyHost = "api.moby.localhost"
++
+ // ErrRedirect is the error returned by checkRedirect when the request is non-GET.
+ var ErrRedirect = errors.New("unexpected redirect in response")
+ 
+diff --git a/vendor/github.com/docker/docker/client/hijack.go b/vendor/github.com/docker/docker/client/hijack.go
+index 6bdacab10a..4dcaaca4c5 100644
+--- a/vendor/github.com/docker/docker/client/hijack.go
++++ b/vendor/github.com/docker/docker/client/hijack.go
+@@ -64,7 +64,11 @@ func fallbackDial(proto, addr string, tlsConfig *tls.Config) (net.Conn, error) {
+ }
+ 
+ func (cli *Client) setupHijackConn(ctx context.Context, req *http.Request, proto string) (net.Conn, string, error) {
+-	req.Host = cli.addr
++	req.URL.Host = cli.addr
++	if cli.proto == "unix" || cli.proto == "npipe" {
++		// Override host header for non-tcp connections.
++		req.Host = DummyHost
++	}
+ 	req.Header.Set("Connection", "Upgrade")
+ 	req.Header.Set("Upgrade", proto)
+ 
+diff --git a/vendor/github.com/docker/docker/client/request.go b/vendor/github.com/docker/docker/client/request.go
+index c799095c12..bcedcf3bd9 100644
+--- a/vendor/github.com/docker/docker/client/request.go
++++ b/vendor/github.com/docker/docker/client/request.go
+@@ -96,16 +96,14 @@ func (cli *Client) buildRequest(method, path string, body io.Reader, headers hea
+ 		return nil, err
+ 	}
+ 	req = cli.addHeaders(req, headers)
++	req.URL.Scheme = cli.scheme
++	req.URL.Host = cli.addr
+ 
+ 	if cli.proto == "unix" || cli.proto == "npipe" {
+-		// For local communications, it doesn't matter what the host is. We just
+-		// need a valid and meaningful host name. (See #189)
+-		req.Host = "docker"
++		// Override host header for non-tcp connections.
++		req.Host = DummyHost
+ 	}
+ 
+-	req.URL.Host = cli.addr
+-	req.URL.Scheme = cli.scheme
+-
+ 	if expectedPayload && req.Header.Get("Content-Type") == "" {
+ 		req.Header.Set("Content-Type", "text/plain")
+ 	}
+diff --git a/vendor/modules.txt b/vendor/modules.txt
+index 807b468777..8bd87c2dfd 100644
+--- a/vendor/modules.txt
++++ b/vendor/modules.txt
+@@ -40,7 +40,7 @@ github.com/docker/distribution/registry/client/transport
+ github.com/docker/distribution/registry/storage/cache
+ github.com/docker/distribution/registry/storage/cache/memory
+ github.com/docker/distribution/uuid
+-# github.com/docker/docker v23.0.5+incompatible
++# github.com/docker/docker v23.0.7-0.20230715134620-0420d2b33c42+incompatible
+ ## explicit
+ github.com/docker/docker/api
+ github.com/docker/docker/api/types
+-- 
+2.40.0
+
