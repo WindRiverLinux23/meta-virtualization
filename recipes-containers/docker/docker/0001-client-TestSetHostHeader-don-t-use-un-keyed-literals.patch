@@ -1,0 +1,60 @@
+From 37fe16e0147d6ecb66c85dfdc3d2bdfab940d939 Mon Sep 17 00:00:00 2001
+From: Sebastiaan van Stijn <github@gone.nl>
+Date: Fri, 14 Jul 2023 18:56:47 +0200
+Subject: [PATCH 1/4] client: TestSetHostHeader: don't use un-keyed literals
+
+Signed-off-by: Sebastiaan van Stijn <github@gone.nl>
+(cherry picked from commit 2a59188760b3062436c482bb40fd153df2c0dc44)
+Signed-off-by: Sebastiaan van Stijn <github@gone.nl>
+
+Upstream-Status: Backport [37fe16e0147d6ecb66c85dfdc3d2bdfab940d939]
+
+Signed-off-by: Chen Qi <Qi.Chen@windriver.com>
+---
+ client/request_test.go | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/client/request_test.go b/client/request_test.go
+index 6e5a6e81f2..a9506d312d 100644
+--- a/client/request_test.go
++++ b/client/request_test.go
+@@ -28,24 +28,24 @@ func TestSetHostHeader(t *testing.T) {
+ 		expectedURLHost string
+ 	}{
+ 		{
+-			"unix:///var/run/docker.sock",
+-			"docker",
+-			"/var/run/docker.sock",
++			host:            "unix:///var/run/docker.sock",
++			expectedHost:    "docker",
++			expectedURLHost: "/var/run/docker.sock",
+ 		},
+ 		{
+-			"npipe:////./pipe/docker_engine",
+-			"docker",
+-			"//./pipe/docker_engine",
++			host:            "npipe:////./pipe/docker_engine",
++			expectedHost:    "docker",
++			expectedURLHost: "//./pipe/docker_engine",
+ 		},
+ 		{
+-			"tcp://0.0.0.0:4243",
+-			"",
+-			"0.0.0.0:4243",
++			host:            "tcp://0.0.0.0:4243",
++			expectedHost:    "",
++			expectedURLHost: "0.0.0.0:4243",
+ 		},
+ 		{
+-			"tcp://localhost:4243",
+-			"",
+-			"localhost:4243",
++			host:            "tcp://localhost:4243",
++			expectedHost:    "",
++			expectedURLHost: "localhost:4243",
+ 		},
+ 	}
+ 
+-- 
+2.40.0
+
